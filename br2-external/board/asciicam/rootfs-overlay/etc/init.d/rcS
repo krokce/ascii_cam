@@ -106,7 +106,13 @@ if [ ! -f /rec/wifi.txt ]; then
 		"# Wi-Fi settings. They are used only when settings.txt says wifi = on" \
 		"# or ssh = on. Replace the example name and password below with your" \
 		"# own network's, keeping the words network and password and the equals" \
-		"# signs. The Pi Zero W can use only 2.4 gigahertz networks." \
+		"# signs. Do not put quotes round them; spaces inside are kept." \
+		"# You may add more pairs, each a network line followed by its password" \
+		"# line, up to 10. A pair may repeat a network name with another" \
+		"# password, or name another network, such as a phone hotspot. The Pi" \
+		"# tries them, prefers the first, and joins the first that works." \
+		"# A password must be 8 to 63 characters long." \
+		"# The Pi Zero W can use only 2.4 gigahertz networks." \
 		"network = example-network-name" \
 		"password = example-password" > /rec/wifi.txt
 fi
@@ -119,24 +125,20 @@ if [ ! -f /rec/authorized_keys.txt ]; then
 		"ssh-ed25519 AAAA-example-key-replace-me you@your-pc" > /rec/authorized_keys.txt
 fi
 
-# Wi-Fi, with network name and password from wifi.txt on REC.
+# Wi-Fi, with the network names and passwords from wifi.txt on REC.
+# wifi.txt may hold several pairs of network and password lines; the
+# Pi tries them, preferring the first, and joins the first that works.
 if [ "$WIFI" = 1 ]; then
-	ssid=$(sed -n 's/^[[:space:]]*network[[:space:]]*=[[:space:]]*//p' /rec/wifi.txt | tr -d '\r' | head -n 1)
-	psk=$(sed -n 's/^[[:space:]]*password[[:space:]]*=[[:space:]]*//p' /rec/wifi.txt | tr -d '\r' | head -n 1)
-	if [ -z "$ssid" ] || [ "$ssid" = "example-network-name" ]; then
-		log_line "Wi-Fi is switched on in settings.txt, but wifi.txt still holds the example network name. Fill in your network name and password."
+	# No ctrl_interface line is written: this wpa_supplicant is built
+	# without the control socket and rejects the whole file if the line
+	# is present.
+	umask 077
+	asciicam-wifi-conf < /rec/wifi.txt > /run/wpa.conf 2> /run/wifi-count.txt
+	umask 022
+	if ! grep -q 'network=' /run/wpa.conf; then
+		log_line "Wi-Fi is switched on in settings.txt, but wifi.txt holds no usable network and password yet. Fill in your network name and password."
 	else
-		umask 077
-		{
-			# No ctrl_interface line: this wpa_supplicant is built
-			# without the control socket and rejects the whole file
-			# if the line is present.
-			echo 'network={'
-			printf '\tssid="%s"\n' "$ssid"
-			printf '\tpsk="%s"\n' "$psk"
-			echo '}'
-		} > /run/wpa.conf
-		umask 022
+		log_line "$(cat /run/wifi-count.txt)"
 		(
 			modprobe brcmfmac
 			n=0
@@ -156,7 +158,9 @@ if [ "$WIFI" = 1 ]; then
 			# without a screen.
 			n=0
 			addr=""
-			while [ -z "$addr" ] && [ $n -lt 30 ]; do
+			# Up to 60 seconds: trying a wrong password takes a few
+			# seconds before the next one is tried.
+			while [ -z "$addr" ] && [ $n -lt 60 ]; do
 				sleep 1
 				n=$((n + 1))
 				addr=$(ip -4 addr show wlan0 2>/dev/null | sed -n 's/.*inet \([0-9.]*\).*/\1/p' | head -n 1)
@@ -170,13 +174,22 @@ if [ "$WIFI" = 1 ]; then
 				printf 'type _device-info._tcp\nport 0\ntxt model=asciicam\n' > /run/mdns.d/device-info.service
 				[ "$SSH" = 1 ] && printf 'type _ssh._tcp\nport 22\n' > /run/mdns.d/ssh.service
 				mdnsd /run/mdns.d > /dev/null 2>&1
-				log_line "Wi-Fi is connected. The network address is $addr. The Pi can also be reached by the name asciicam.local."
+				# Name the network that was joined, from the number of
+				# its entry in the Wi-Fi log. The password is never logged.
+				id=$(sed -n 's/.*CTRL-EVENT-CONNECTED.*\[id=\([0-9]*\).*/\1/p' /rec/system/wifi-log.txt 2>/dev/null | tail -n 1)
+				joined=""
+				[ -n "$id" ] && joined=$(asciicam-wifi-conf --names < /rec/wifi.txt | sed -n "$((id + 1))p")
+				if [ -n "$joined" ]; then
+					log_line "Wi-Fi is connected to $joined, using entry $((id + 1)) of wifi.txt. The network address is $addr. The Pi can also be reached by the name asciicam.local."
+				else
+					log_line "Wi-Fi is connected. The network address is $addr. The Pi can also be reached by the name asciicam.local."
+				fi
 			elif [ ! -e /sys/class/net/wlan0 ]; then
 				log_line "Wi-Fi could not start, because the Wi-Fi chip did not appear. The kernel log is in system/kernel-log.txt on REC."
 			elif [ "$(cat /sys/class/net/wlan0/operstate 2>/dev/null)" = up ]; then
-				log_line "Wi-Fi joined the network, but got no address from the router within 30 seconds."
+				log_line "Wi-Fi joined the network, but got no address from the router within 60 seconds."
 			else
-				log_line "Wi-Fi could not join the network within 30 seconds. Check the network name and password in wifi.txt. The Pi Zero W can use only 2.4 gigahertz networks. The messages of the Wi-Fi program are in system/wifi-log.txt on REC."
+				log_line "Wi-Fi could not join any network within 60 seconds. Check the network names and passwords in wifi.txt. The Pi Zero W can use only 2.4 gigahertz networks. The messages of the Wi-Fi program are in system/wifi-log.txt on REC."
 			fi
 			sync
 			ntpd -n -q -p pool.ntp.org > /dev/null 2>&1 && touch /run/asciicam-clock-ok

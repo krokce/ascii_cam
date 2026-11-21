@@ -20,6 +20,8 @@ TESTDIR = ../tests
 test: $(TESTDIR)/test_core
 	cd $(TESTDIR) && ./test_core
 	cd $(TESTDIR) && python3 -I test_replay.py
+	cd $(TESTDIR) && sh test_wifi.sh
+	if command -v busybox > /dev/null; then cd $(TESTDIR) && busybox ash test_wifi.sh; fi
 
 $(TESTDIR)/test_core: $(TESTDIR)/test_core.c $(CORE) asciicam.h font.h
 	cc -O1 -g -std=gnu11 -Wall -Wextra -Wno-unused-parameter -fsanitize=address,undefined \

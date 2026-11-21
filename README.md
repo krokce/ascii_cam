@@ -55,8 +55,9 @@ Other documents in this folder:
 15. The SD card image was built and examined. The partitions start on 4 megabyte boundaries. The partition labels are BOOT and REC. The boot partition holds the firmware, the kernel, the device tree, the overlays, config.txt and cmdline.txt. The root filesystem holds the program and all the necessary kernel modules. The program is built for the ARMv6 core with hardware floating point. It needs only the C library and the maths library.
 16. The button order is mode 1, mode 2, mode 3, then mode 1 again. A button press rewrites only the mode line of settings.txt and keeps all comments. The wifi and ssh lines are read correctly. In colour mode, the MDA text has the nine shade tones. The large mode banner is drawn correctly.
 17. The start-up script reads wifi and ssh from settings.txt correctly. It ignores comment lines, and it accepts on, On and yes.
-18. The image contains the Wi-Fi driver firmware, wpa_supplicant and the Dropbear SSH server. No start-up script runs them unless settings.txt switches them on.
-19. Every one of the 18 settings in settings.txt has a "Possible values" line and a "Default" line. Values that are not the defaults survive writing and reading back. An old settings.txt without the version line is recognised.
+18. The Wi-Fi configuration script turns wifi.txt into the right wpa_supplicant entries: one pair, two passwords for one network, two networks, spaces inside values, Windows line endings, and skipped entries. It is tested with dash, and with BusyBox ash when BusyBox is installed.
+19. The image contains the Wi-Fi driver firmware, wpa_supplicant and the Dropbear SSH server. No start-up script runs them unless settings.txt switches them on.
+20. Every one of the 18 settings in settings.txt has a "Possible values" line and a "Default" line. Values that are not the defaults survive writing and reading back. An old settings.txt without the version line is recognised.
 
 ### 2.3 Confirmed on the real Pi
 
@@ -273,10 +274,11 @@ The appliance uses these values in DPI pixels:
 10. The small mDNS service mdnsd answers to the name asciicam.local, so you can use the name instead of the address. It runs only while Wi-Fi is on. It announces SSH only when ssh = on. It always announces a small device information service, because mdnsd answers to the name only when it has at least one service to announce.
 11. If Wi-Fi or SSH is switched on but its file still holds the example text, the log says so.
 12. The serial console stays a build option, off by default. It uses GPIO 14 and GPIO 15 and does not conflict with the display.
-13. The messages of wpa_supplicant, the program that joins the network, go to system/wifi-log.txt on REC. The file is renewed at every boot. The password is not written there. Reason: you can see why Wi-Fi fails without a screen.
-14. The settings file for wpa_supplicant holds only the network name and password. It has no ctrl_interface line, because this build of wpa_supplicant has no control socket and rejects the file if the line is there.
-15. If Wi-Fi fails, log.txt says which step failed: the Wi-Fi chip did not appear, the Pi could not join the network, or it joined but got no address from the router.
-16. All pauses in the start-up script are whole seconds, because BusyBox sleep here does not accept fractions.
+13. wifi.txt may hold up to 10 pairs of network and password lines. A pair may repeat a network name with another password, or name another network. User decision. The script /usr/bin/asciicam-wifi-conf turns the pairs into one wpa_supplicant entry each. The first pair gets the highest priority. When a password is refused, wpa_supplicant puts that entry aside for a while and tries the next. The log says how many pairs are usable, and which network and pair were joined. It never writes a password. Pairs with the example name, with no password, or with a password that is not 8 to 63 characters long are skipped, and the log says how many. The wait for a connection is 60 seconds, because each refused password takes a few seconds.
+14. The messages of wpa_supplicant, the program that joins the network, go to system/wifi-log.txt on REC. The file is renewed at every boot. The password is not written there. Reason: you can see why Wi-Fi fails without a screen.
+15. The settings file for wpa_supplicant holds only the network names, passwords and priorities. It has no ctrl_interface line, because this build of wpa_supplicant has no control socket and rejects the file if the line is there.
+16. If Wi-Fi fails, log.txt says which step failed: the Wi-Fi chip did not appear, the Pi could not join the network, or it joined but got no address from the router.
+17. All pauses in the start-up script are whole seconds, because BusyBox sleep here does not accept fractions.
 
 ### 5.12 Operating modes and the mode button
 
@@ -340,8 +342,9 @@ The appliance uses these values in DPI pixels:
 9. src/kms.c controls the displays.
 10. src/camera.c controls the camera.
 11. src/video.c controls the video encoder.
-12. src/button.c reads the mode button. src/gpio_v2_compat.h holds the GPIO interface definitions for older compiler headers.
-13. tests/test_core.c and tests/test_replay.py are the tests.
+12. br2-external/board/asciicam/rootfs-overlay/usr/bin/asciicam-wifi-conf turns wifi.txt into the settings file for wpa_supplicant.
+13. src/button.c reads the mode button. src/gpio_v2_compat.h holds the GPIO interface definitions for older compiler headers.
+14. tests/test_core.c, tests/test_replay.py and tests/test_wifi.sh are the tests.
 
 ### 6.4 The project folders
 
@@ -555,15 +558,22 @@ No rebuild is necessary.
 3. Open wifi.txt on REC.
 4. Change the network line to the name of your network. For example: network = MyHomeNetwork
 5. Change the password line to the password of your network. For example: password = my secret password
-6. Save the file.
-7. Open settings.txt on REC.
-8. Find the line wifi = off and change it to: wifi = on
+   Do not put quotes round the name or the password. Spaces inside them are kept. A space at the end of the line also counts, so end the line right after the last character. A password must be 8 to 63 characters long.
+6. Optional: add more pairs below the first one, each a network line followed by its password line, up to 10 pairs. A pair can repeat the network name with another password, or name another network, such as a phone hotspot. For example, these four lines give one network two passwords:
+   network = MyHomeNetwork
+   password = my secret password
+   network = MyHomeNetwork
+   password = my old password
+   The Pi tries the pairs, prefers the first, and joins the first that works.
+7. Save the file.
+8. Open settings.txt on REC.
+9. Find the line wifi = off and change it to: wifi = on
    If there is no wifi line, add the line at the end of the file.
-9. Save the file. Put the card back in the Pi and connect the power. Wait one minute.
-10. Disconnect the power and put the card in your PC.
-11. Open log.txt on REC. Find the line with the words "Wi-Fi is connected". It gives the network address of the Pi, for example 192.168.1.57.
+10. Save the file. Put the card back in the Pi and connect the power. Wait one minute.
+11. Disconnect the power and put the card in your PC.
+12. Open log.txt on REC. One line says how many usable pairs wifi.txt holds. Then find the line with the words "Wi-Fi is connected". It names the network that was joined and the number of its pair in wifi.txt, and it gives the network address of the Pi, for example 192.168.1.57.
     You can also use the name asciicam.local instead of the address, from any PC that understands mDNS names. Ubuntu, Debian with Avahi, macOS and Windows 10 or newer do. In your router's list of devices, the Pi appears with the name asciicam.
-12. If the log says that Wi-Fi could not join the network, check the network name and the password in wifi.txt. The Pi Zero W can use only 2.4 gigahertz networks. The file system/wifi-log.txt on REC holds the messages of the Wi-Fi program, with the reason. See section 16.
+13. If the log says that Wi-Fi could not join any network, check the network names and the passwords in wifi.txt. The Pi Zero W can use only 2.4 gigahertz networks. The file system/wifi-log.txt on REC holds the messages of the Wi-Fi program, with the reason. See section 16.
 
 When Wi-Fi is connected, the Pi also sets its clock from the internet. Then new recording files get their real start time.
 
@@ -571,7 +581,7 @@ When Wi-Fi is connected, the Pi also sets its clock from the internet. Then new 
 
 No rebuild is necessary. SSH also switches on Wi-Fi.
 
-1. Fill in wifi.txt, as in section 14.1, steps 1 to 6.
+1. Fill in wifi.txt, as in section 14.1, steps 1 to 7.
 2. If you do not have an SSH key on your PC, make one. Type: ssh-keygen -t ed25519
    Press Enter at each question to accept the default.
 3. Show your public key. Type: cat ~/.ssh/id_ed25519.pub
@@ -582,7 +592,7 @@ No rebuild is necessary. SSH also switches on Wi-Fi.
 8. Open settings.txt on REC. Change the line ssh = off to: ssh = on
    If there is no ssh line, add the line at the end of the file.
 9. Save the file. Put the card back in the Pi and connect the power. Wait one minute.
-10. Disconnect the power and put the card in your PC. Find the network address in log.txt, as in section 14.1, step 11.
+10. Disconnect the power and put the card in your PC. Find the network address in log.txt, as in section 14.1, step 12.
 11. Put the card back in the Pi and connect the power. Wait one minute.
 12. On your PC, type: ssh root@asciicam.local
     If the name does not work, type ssh root@ followed by the address from log.txt. For example: ssh root@192.168.1.57

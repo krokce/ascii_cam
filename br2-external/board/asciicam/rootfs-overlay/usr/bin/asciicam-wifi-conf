@@ -1,0 +1,90 @@
+#!/bin/sh
+# Turns wifi.txt into the settings file for wpa_supplicant.
+#
+#   asciicam-wifi-conf < wifi.txt > wpa.conf
+#       writes one network block per usable pair, and prints a plain
+#       sentence about the pairs on standard error.
+#   asciicam-wifi-conf --names < wifi.txt
+#       prints the network name of each usable pair, one per line, in
+#       the same order, so the start-up script can say which one joined.
+#
+# wifi.txt holds pairs of lines: a "network = name" line, then its
+# "password = secret" line. A pair may repeat a network name with
+# another password, or name another network. The first pair is
+# preferred: it gets the highest priority. Spaces inside a name or a
+# password are kept; spaces right after the equals sign are not.
+# Pairs with the example name, without a password, or with a password
+# that is not 8 to 63 characters long are skipped. At most 10 pairs.
+
+names_only=0
+[ "$1" = "--names" ] && names_only=1
+
+count=0
+skipped=0
+priority=10
+name=""
+have_name=0
+
+emit() {
+	# $1 name, $2 password
+	if [ "$1" = "example-network-name" ]; then
+		return
+	fi
+	len=${#2}
+	if [ "$len" -lt 8 ] || [ "$len" -gt 63 ]; then
+		skipped=$((skipped + 1))
+		return
+	fi
+	if [ "$count" -ge 10 ]; then
+		skipped=$((skipped + 1))
+		return
+	fi
+	count=$((count + 1))
+	if [ "$names_only" = 1 ]; then
+		printf '%s\n' "$1"
+		return
+	fi
+	printf 'network={\n'
+	printf '\tssid="%s"\n' "$1"
+	printf '\tpsk="%s"\n' "$2"
+	printf '\tpriority=%d\n' "$priority"
+	printf '}\n'
+	priority=$((priority - 1))
+	[ "$priority" -lt 1 ] && priority=1
+}
+
+while IFS= read -r line || [ -n "$line" ]; do
+	line=$(printf '%s' "$line" | tr -d '\r')
+	# Drop spaces at the start of the line.
+	trimmed="${line#"${line%%[!	 ]*}"}"
+	case "$trimmed" in
+	''|'#'*)
+		continue
+		;;
+	network*=*|password*=*)
+		key="${trimmed%%=*}"
+		key="${key%"${key##*[!	 ]}"}"
+		value="${trimmed#*=}"
+		value="${value#"${value%%[!	 ]*}"}"
+		if [ "$key" = "network" ]; then
+			[ "$have_name" = 1 ] && skipped=$((skipped + 1))
+			name="$value"
+			have_name=1
+		elif [ "$key" = "password" ] && [ "$have_name" = 1 ]; then
+			emit "$name" "$value"
+			have_name=0
+		fi
+		;;
+	esac
+done
+[ "$have_name" = 1 ] && [ "$name" != "example-network-name" ] && skipped=$((skipped + 1))
+
+if [ "$names_only" = 0 ]; then
+	if [ "$skipped" -gt 0 ]; then
+		if [ "$skipped" -eq 1 ]; then what="1 entry was"; else what="$skipped entries were"; fi
+		echo "wifi.txt holds $count usable networks or passwords to try; $what skipped, because a password was missing or not 8 to 63 characters long." >&2
+	else
+		echo "wifi.txt holds $count usable networks or passwords to try." >&2
+	fi
+fi
+exit 0
