@@ -128,7 +128,9 @@ if [ "$WIFI" = 1 ]; then
 	else
 		umask 077
 		{
-			echo 'ctrl_interface=/run/wpa_supplicant'
+			# No ctrl_interface line: this wpa_supplicant is built
+			# without the control socket and rejects the whole file
+			# if the line is present.
 			echo 'network={'
 			printf '\tssid="%s"\n' "$ssid"
 			printf '\tpsk="%s"\n' "$psk"
