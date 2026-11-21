@@ -141,7 +141,12 @@ if [ "$WIFI" = 1 ]; then
 			# BusyBox sleep takes whole seconds only.
 			while [ ! -e /sys/class/net/wlan0 ] && [ $n -lt 15 ]; do sleep 1; n=$((n + 1)); done
 			ip link set lo up
-			wpa_supplicant -B -i wlan0 -c /run/wpa.conf > /dev/null 2>&1
+			# wpa_supplicant joins the network. Its messages go to
+			# system/wifi-log.txt on REC, renewed at every boot, so a
+			# failure can be read on a PC: network not found, wrong
+			# password, and so on. The password is never written there.
+			rm -f /rec/system/wifi-log.txt
+			wpa_supplicant -B -t -D nl80211 -i wlan0 -c /run/wpa.conf -f /rec/system/wifi-log.txt
 			# -x hostname sends the name asciicam to the router, so the
 			# router's list of devices shows the Pi by name.
 			udhcpc -b -q -i wlan0 -x hostname:asciicam -s /usr/share/udhcpc/default.script > /dev/null 2>&1 &
@@ -169,7 +174,7 @@ if [ "$WIFI" = 1 ]; then
 			elif [ "$(cat /sys/class/net/wlan0/operstate 2>/dev/null)" = up ]; then
 				log_line "Wi-Fi joined the network, but got no address from the router within 30 seconds."
 			else
-				log_line "Wi-Fi could not join the network within 30 seconds. Check the network name and password in wifi.txt. The Pi Zero W can use only 2.4 gigahertz networks."
+				log_line "Wi-Fi could not join the network within 30 seconds. Check the network name and password in wifi.txt. The Pi Zero W can use only 2.4 gigahertz networks. The messages of the Wi-Fi program are in system/wifi-log.txt on REC."
 			fi
 			sync
 			ntpd -n -q -p pool.ntp.org > /dev/null 2>&1 && touch /run/asciicam-clock-ok
