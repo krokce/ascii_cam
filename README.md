@@ -252,8 +252,10 @@ The appliance uses these values in DPI pixels:
 6. SSH accepts only key logins for root. It refuses passwords.
 7. The SSH host key is kept on REC, so it stays the same after a restart.
 8. When Wi-Fi connects, the Pi writes its network address to log.txt. Reason: you can find the address without a screen.
-9. If Wi-Fi or SSH is switched on but its file still holds the example text, the log says so.
-10. The serial console stays a build option, off by default. It uses GPIO 14 and GPIO 15 and does not conflict with the display.
+9. The network name of the Pi is asciicam. The Pi sends this name to the router when it asks for an address, so the router's list of devices shows it by name.
+10. The small mDNS service mdnsd answers to the name asciicam.local, so you can use the name instead of the address. It runs only while Wi-Fi is on. It announces SSH only when ssh = on. It always announces a small device information service, because mdnsd answers to the name only when it has at least one service to announce.
+11. If Wi-Fi or SSH is switched on but its file still holds the example text, the log says so.
+12. The serial console stays a build option, off by default. It uses GPIO 14 and GPIO 15 and does not conflict with the display.
 
 ### 5.12 Operating modes and the mode button
 
@@ -538,6 +540,7 @@ No rebuild is necessary.
 9. Save the file. Put the card back in the Pi and connect the power. Wait one minute.
 10. Disconnect the power and put the card in your PC.
 11. Open log.txt on REC. Find the line with the words "Wi-Fi is connected". It gives the network address of the Pi, for example 192.168.1.57.
+    You can also use the name asciicam.local instead of the address, from any PC that understands mDNS names. Ubuntu, Debian with Avahi, macOS and Windows 10 or newer do. In your router's list of devices, the Pi appears with the name asciicam.
 12. If the log says that Wi-Fi could not connect, check the network name and the password in wifi.txt. The Pi Zero W can use only 2.4 gigahertz networks.
 
 When Wi-Fi is connected, the Pi also sets its clock from the internet. Then new recording files get their real start time.
@@ -559,7 +562,8 @@ No rebuild is necessary. SSH also switches on Wi-Fi.
 9. Save the file. Put the card back in the Pi and connect the power. Wait one minute.
 10. Disconnect the power and put the card in your PC. Find the network address in log.txt, as in section 14.1, step 11.
 11. Put the card back in the Pi and connect the power. Wait one minute.
-12. On your PC, type ssh root@ followed by the address. For example: ssh root@192.168.1.57
+12. On your PC, type: ssh root@asciicam.local
+    If the name does not work, type ssh root@ followed by the address from log.txt. For example: ssh root@192.168.1.57
 13. The first time, SSH asks if you trust the host key. Type yes and press Enter.
 
 Note: the root filesystem is read-only. To change files on it, change the project on the build computer and build a new image.

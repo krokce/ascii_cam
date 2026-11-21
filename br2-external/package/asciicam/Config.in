@@ -12,6 +12,7 @@ config BR2_PACKAGE_ASCIICAM
 	select BR2_PACKAGE_BRCMFMAC_SDIO_FIRMWARE_RPI
 	select BR2_PACKAGE_BRCMFMAC_SDIO_FIRMWARE_RPI_WIFI
 	select BR2_PACKAGE_DROPBEAR
+	select BR2_PACKAGE_MDNSD # the name asciicam.local on the network
 	help
 	  The camera to MDA text appliance program, its init scripts
 	  and the first-boot REC partition grower. Wi-Fi and SSH are

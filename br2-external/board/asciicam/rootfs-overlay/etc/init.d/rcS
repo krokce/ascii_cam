@@ -141,7 +141,9 @@ if [ "$WIFI" = 1 ]; then
 			while [ ! -e /sys/class/net/wlan0 ] && [ $n -lt 50 ]; do sleep 0.2; n=$((n + 1)); done
 			ip link set lo up
 			wpa_supplicant -B -i wlan0 -c /run/wpa.conf > /dev/null 2>&1
-			udhcpc -b -q -i wlan0 -s /usr/share/udhcpc/default.script > /dev/null 2>&1 &
+			# -x hostname sends the name asciicam to the router, so the
+			# router's list of devices shows the Pi by name.
+			udhcpc -b -q -i wlan0 -x hostname:asciicam -s /usr/share/udhcpc/default.script > /dev/null 2>&1 &
 			# Write the network address to the log, so it can be found
 			# without a screen.
 			n=0
@@ -152,7 +154,15 @@ if [ "$WIFI" = 1 ]; then
 				addr=$(ip -4 addr show wlan0 2>/dev/null | sed -n 's/.*inet \([0-9.]*\).*/\1/p' | head -n 1)
 			done
 			if [ -n "$addr" ]; then
-				log_line "Wi-Fi is connected. The network address is $addr."
+				# mdnsd answers to the name asciicam.local. It needs
+				# at least one service file to do so: the device
+				# information one is always there, the SSH one only
+				# when SSH is switched on.
+				mkdir -p /run/mdns.d
+				printf 'type _device-info._tcp\nport 0\ntxt model=asciicam\n' > /run/mdns.d/device-info.service
+				[ "$SSH" = 1 ] && printf 'type _ssh._tcp\nport 22\n' > /run/mdns.d/ssh.service
+				mdnsd /run/mdns.d > /dev/null 2>&1
+				log_line "Wi-Fi is connected. The network address is $addr. The Pi can also be reached by the name asciicam.local."
 			else
 				log_line "Wi-Fi could not connect within 30 seconds. Check the network name and password in wifi.txt."
 			fi
