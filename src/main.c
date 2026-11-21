@@ -110,6 +110,12 @@ int main(void)
 	}
 	if (settings_load(&s, SETTINGS_PATH, warn_setting) != 0)
 		settings_default(&s);
+	/* Bring a settings.txt from an older version up to date: the
+	 * comments are renewed and every value is kept. */
+	if (have_rec && !settings_is_current(SETTINGS_PATH)) {
+		if (settings_write(SETTINGS_PATH, &s) == 0)
+			log_msg("settings.txt was written by an older version, so its comments were updated. All values were kept.");
+	}
 	if (!have_rec)
 		log_msg("The REC partition is not available, so the default settings are used and nothing is recorded.");
 

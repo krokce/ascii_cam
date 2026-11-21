@@ -388,6 +388,56 @@ static void test_operating_modes(void)
 	printf("Operating modes: the button steps from mode 1 shade to mode 2 characters to mode 3 colour and back, the mode line of settings.txt is rewritten without losing comments, wifi and ssh are read, colour mode gives the MDA nine shade tones, and the mode banner draws %d blocks.\n", full);
 }
 
+
+static void test_settings_template(void)
+{
+	struct settings a, b;
+	char path[] = "out/settings-template.txt";
+	char line[512];
+	int settings_lines = 0, documented = 0, possible_seen = 0;
+	FILE *f;
+
+	mkdir("out", 0777);
+	settings_default(&a);
+	a.mode = MODE_COLOUR;
+	a.output = OUT_EMU;
+	a.hdmi_colour = COL_RED;
+	a.phosphor = COL_AMBER;
+	a.cols = 40;
+	strcpy(a.ramp, " .oO@");
+	a.contrast = 140;
+	a.frame_rate = 10;
+	a.upside_down = 1;
+	a.wifi = 1;
+	a.ssh = 1;
+	CHECK(settings_write(path, &a) == 0, "template: could not write settings");
+	CHECK(settings_is_current(path), "template: the version marker is missing");
+	settings_load(&b, path, NULL);
+	CHECK(!memcmp(&a, &b, sizeof(a)), "template: values did not survive writing and reading");
+
+	/* Every setting line must follow a "Possible values" comment. */
+	f = fopen(path, "r");
+	while (f && fgets(line, sizeof(line), f)) {
+		if (!strncmp(line, "# Possible values:", 18))
+			possible_seen = 1;
+		else if (line[0] != '#' && strchr(line, '=')) {
+			settings_lines++;
+			documented += possible_seen;
+			possible_seen = 0;
+		}
+	}
+	if (f)
+		fclose(f);
+	CHECK(settings_lines == 18 && documented == 18, "template: %d of %d settings list their possible values", documented, settings_lines);
+
+	/* An old file without the marker is recognised as old. */
+	f = fopen(path, "w");
+	fputs("mode = shade\r\n", f);
+	fclose(f);
+	CHECK(!settings_is_current(path), "template: an old file should be recognised");
+	printf("The settings template lists the possible values and the default for all %d settings, and non-default values survive writing and reading.\n", settings_lines);
+}
+
 static void warn_collect(const char *m) { (void)m; checks++; }
 
 static void test_settings(void)
@@ -585,6 +635,7 @@ int main(void)
 	test_pattern_and_gray();
 	test_settings();
 	test_operating_modes();
+	test_settings_template();
 	test_recording();
 	test_timing();
 	if (failures) {

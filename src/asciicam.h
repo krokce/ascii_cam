@@ -87,6 +87,8 @@ struct canvas {
 void settings_default(struct settings *s);
 int settings_load(struct settings *s, const char *path, void (*warn)(const char *msg));
 int settings_write_default(const char *path);
+int settings_write(const char *path, const struct settings *s);
+int settings_is_current(const char *path);
 const char *mode_name(enum draw_mode m);
 const char *mode_keyword(enum draw_mode m);
 enum draw_mode mode_next(enum draw_mode m);
