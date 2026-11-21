@@ -38,7 +38,7 @@ Other documents in this folder:
 
 ### 2.2 What was verified on the build computer
 
-1. Sixty-eight checks of the C code pass. They use test images and a framebuffer in memory.
+1. Seventy-three checks of the C code pass. They use test images and a framebuffer in memory.
 2. Characters mode gives 19 tones, from a space to a bright at sign, in the correct order.
 3. Shade blocks mode gives all 9 tones in the correct order.
 4. Half blocks mode shows an 80 by 50 grid.
@@ -56,6 +56,7 @@ Other documents in this folder:
 16. The button order is mode 1, mode 2, mode 3, then mode 1 again. A button press rewrites only the mode line of settings.txt and keeps all comments. The wifi and ssh lines are read correctly. In colour mode, the MDA text has the nine shade tones. The large mode banner is drawn correctly.
 17. The start-up script reads wifi and ssh from settings.txt correctly. It ignores comment lines, and it accepts on, On and yes.
 18. The image contains the Wi-Fi driver firmware, wpa_supplicant and the Dropbear SSH server. No start-up script runs them unless settings.txt switches them on.
+19. Every one of the 18 settings in settings.txt has a "Possible values" line and a "Default" line. Values that are not the defaults survive writing and reading back. An old settings.txt without the version line is recognised.
 
 ### 2.3 What needs the real hardware
 
@@ -233,12 +234,13 @@ The appliance uses these values in DPI pixels:
 
 ### 5.10 Settings, test mode and log
 
-1. The settings are in settings.txt on REC. Each setting is on one line. A comment in plain words explains each setting.
+1. The settings are in settings.txt on REC. Each setting is on one line. A comment in plain words explains each setting. Each comment ends with a line that lists all possible values and a line that gives the default. Reason: you can change a setting without other documents.
 2. The program reads the settings when it starts. If settings.txt is missing, the program writes a new one with the default values.
 3. A bad line causes a sentence in the log, and the program uses the default for that setting.
 4. If a file named test.txt is on REC, the program shows the test pattern. The pattern has a border, all tones of all modes and a large counter. The program checks for test.txt every 2 seconds.
 5. The log is log.txt on REC. Each line is a plain sentence. It starts with the boot number and the seconds since power-on. At one megabyte, the log becomes log-old.txt and a new log starts.
 6. There is no configuration tool for the PC. You edit the text files on REC by hand. User decision.
+7. The first line of settings.txt is "# Settings file version 2". The program writes the file from one template, filled with the current values. When the program finds a settings.txt without this line, it writes the file again with the new comments and keeps every value. It writes one sentence about this in log.txt. Reason: older cards get the new comments without hand work. Lines with unknown names are reported in the log and are not kept.
 
 ### 5.11 Wi-Fi, SSH and the serial console
 
@@ -423,34 +425,41 @@ Warning: writing the image erases everything on the card, including old recordin
 1. Disconnect the power.
 2. Put the SD card in your PC.
 3. Open settings.txt on the REC partition with a text editor.
-4. Change the values. Keep the name, the equals sign and the value on one line.
+4. Find the setting. Read the lines above it, which start with "Possible values" and "Default". Change the value to one of the possible values. Keep the name, the equals sign and the value on one line.
 5. Save the file.
 6. Put the card back in the Pi and connect the power. The program reads the settings when it starts.
 
-The settings are these. The default is given for each.
+The settings are these. Each item gives all possible values and the default. The same lists are in the comments of settings.txt.
 
-1. mode: shade, characters or colour, which are modes 1, 2 and 3. You can also write the numbers 1, 2 or 3. The values halfblocks and shapes are also allowed. The default is shade. The mode button rewrites this line.
-2. output: both, mda, hdmi or emulation. The default is both.
-3. hdmi_colour: green, amber, white or red. The default is green.
-4. hdmi_gray: on or off. The default is off.
-5. phosphor: green, amber or white, for emulation. The default is green.
-6. scanlines: on or off, for emulation. The default is off.
-7. glow: on or off, for emulation. The default is off.
-8. grid: 80x25 or 40x25. The default is 80x25.
-9. ramp: the characters for the characters mode, darkest first, between double quotes. The default is " .:-=+*#%@".
-10. dithering: on or off. The default is off.
-11. contrast: a percentage from 50 to 200. The default is 100.
-12. frame_rate: the highest frames per second, from 1 to 30. The default is 15.
-13. recording: on or off, for the text recording. The default is on.
-14. video: on or off, for the video recording. The default is off.
-15. upside_down: on or off. The default is off.
-16. mirror: on or off. The default is off.
-17. wifi: on or off. The default is off.
-18. ssh: on or off. It also switches on Wi-Fi. The default is off.
+1. mode: the operating mode.
+   1. shade, or 1, is mode 1, shade blocks.
+   2. characters, or 2, is mode 2, letters.
+   3. colour, or 3, is mode 3, the colour camera video on HDMI. color is also accepted.
+   4. halfblocks and shapes are two more drawing modes. They are not on the button.
+   5. The default is shade. The mode button rewrites this line.
+2. output: where the picture goes. Possible values: both, mda, hdmi, emulation. The default is both.
+3. hdmi_colour: the text colour on HDMI. The name hdmi_color is also accepted. Possible values: green, amber, white, red. The default is green.
+4. hdmi_gray: 16 real gray levels on HDMI. The name hdmi_grey is also accepted. Possible values: on, off. The default is off.
+5. phosphor: the colour in the emulation output. Possible values: green, amber, white. The default is green.
+6. scanlines: faint scan lines in the emulation output. Possible values: on, off. The default is off.
+7. glow: a soft glow in the emulation output. Possible values: on, off. The default is off.
+8. grid: the grid size. Possible values: 80x25, 40x25. The default is 80x25.
+9. ramp: the characters for mode 2, darkest first, between double quotes. Possible values: 2 to 60 printable characters. The default is " .:-=+*#%@".
+10. dithering: spreads rounding errors to neighbouring cells. Possible values: on, off. The default is off.
+11. contrast: the contrast in percent. Possible values: any whole number from 50 to 200. The default is 100.
+12. frame_rate: the highest number of frames per second. Possible values: any whole number from 1 to 30. The default is 15.
+13. recording: the text recording. Possible values: on, off. The default is on.
+14. video: the video recording at 1280 by 720. Possible values: on, off. The default is off.
+15. upside_down: for a camera mounted upside down. Possible values: on, off. The default is off.
+16. mirror: shows the picture mirrored left to right. Possible values: on, off. The default is off.
+17. wifi: Wi-Fi. Possible values: on, off. The default is off.
+18. ssh: SSH. It also switches on Wi-Fi. Possible values: on, off. The default is off.
+
+For all settings with on and off, the program also accepts yes, no, 1 and 0.
 
 If you delete settings.txt, the program writes a new one with the default values at the next start.
 
-A settings.txt written by an older version of the program has no wifi and no ssh lines. Both are then off. To use them, add the lines by hand, or delete settings.txt so that a new one with all the lines is written.
+If settings.txt comes from an older version of the program, the program updates its comments at the next start and keeps all values. A missing setting gets its default value.
 
 ## 12. Recordings and the replay tool
 
