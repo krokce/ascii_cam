@@ -31,3 +31,11 @@ if find "$TARGET/lib/modules" -name '*.ko.xz' | grep -q . ; then
 		exit 1
 	fi
 fi
+
+# Safety check: BusyBox sleep here accepts whole seconds only. A
+# fractional sleep in a start-up script would return at once without
+# waiting, which once made Wi-Fi start before its chip was ready.
+if grep -n -E 'sleep +[0-9]*\.[0-9]' "$TARGET/etc/init.d/rcS" "$TARGET/usr/bin/asciicam-run" 2>/dev/null; then
+	echo "ERROR: fractional sleep found in a start-up script; use whole seconds." >&2
+	exit 1
+fi
