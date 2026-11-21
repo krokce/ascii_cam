@@ -58,20 +58,37 @@ Other documents in this folder:
 18. The image contains the Wi-Fi driver firmware, wpa_supplicant and the Dropbear SSH server. No start-up script runs them unless settings.txt switches them on.
 19. Every one of the 18 settings in settings.txt has a "Possible values" line and a "Default" line. Values that are not the defaults survive writing and reading back. An old settings.txt without the version line is recognised.
 
-### 2.3 What needs the real hardware
+### 2.3 Confirmed on the real Pi
 
-These items cannot be checked without a real Pi:
+The owner tested the appliance on the real Pi Zero W with an HDMI screen. These items work:
 
-1. The sync frequencies, measured with a multimeter as the safety guide tells you.
-2. The camera.
-3. The DPI output and the HDMI output running at the same time.
-4. The text colour on HDMI, which comes from a colour table in the display hardware.
-5. The doubling of the picture width by the display hardware. If this fails, the program draws a double-width picture itself and writes a line in the log.
-6. Video recording with the hardware encoder.
-7. Plugging in and removing an HDMI screen while the appliance runs.
-8. The boot time. The target is less than 10 seconds.
-9. Wi-Fi, SSH and the serial console.
-10. The mode button and the colour picture on HDMI.
+1. The boot, the enlarging of REC on the first boot, and the program start.
+2. The picture on HDMI.
+3. The camera. The log shows it running at 320 by 240, at 640 by 480 in colour mode, and at 1280 by 720 with video recording on.
+4. Colour mode, set in settings.txt.
+5. Wi-Fi with a WPA2 network on 2.4 gigahertz.
+6. SSH with a key, and the name asciicam.local.
+7. The automatic update of an older settings.txt.
+
+The log also shows that the program starts about 7 to 9 seconds after power-on.
+
+### 2.4 Still to check on the real hardware
+
+1. The sync frequencies, measured with a multimeter as the safety guide tells you, and then the picture on the MDA monitor.
+2. The DPI output and the HDMI output running at the same time.
+3. The doubling of the picture width by the display hardware for the MDA monitor. If this fails, the program draws a double-width picture itself and writes a line in the log.
+4. The mode button.
+5. The files of the video recording, played on a PC.
+6. Plugging in and removing an HDMI screen while the appliance runs.
+7. The serial console.
+
+### 2.5 Faults found on the real Pi and their fixes
+
+Three faults appeared only on the real Pi. All three are fixed, and the build now checks for the first two.
+
+1. Black screen on the first boot. The kernel modules are compressed with xz, but the module loader was built without xz support, so no driver loaded: not the display and not the camera. Fix: xz support is in the configuration, and the build stops if it is missing.
+2. Wi-Fi did not start. The start-up script used pauses of a fraction of a second, such as sleep 0.5. BusyBox in this image accepts whole seconds only, so these pauses returned at once. Wi-Fi was started before the Wi-Fi chip was ready, and the wait for an address ended at once. Fix: whole-second pauses, and the build stops if a fractional pause appears in a start-up script.
+3. Wi-Fi still did not join the network. The settings file that the script writes for wpa_supplicant started with a ctrl_interface line. This build of wpa_supplicant has no control socket, so it rejected the whole file. The Wi-Fi log on REC showed this. Fix: the line is removed.
 
 ## 3. GPIO and header pins
 
@@ -256,6 +273,10 @@ The appliance uses these values in DPI pixels:
 10. The small mDNS service mdnsd answers to the name asciicam.local, so you can use the name instead of the address. It runs only while Wi-Fi is on. It announces SSH only when ssh = on. It always announces a small device information service, because mdnsd answers to the name only when it has at least one service to announce.
 11. If Wi-Fi or SSH is switched on but its file still holds the example text, the log says so.
 12. The serial console stays a build option, off by default. It uses GPIO 14 and GPIO 15 and does not conflict with the display.
+13. The messages of wpa_supplicant, the program that joins the network, go to system/wifi-log.txt on REC. The file is renewed at every boot. The password is not written there. Reason: you can see why Wi-Fi fails without a screen.
+14. The settings file for wpa_supplicant holds only the network name and password. It has no ctrl_interface line, because this build of wpa_supplicant has no control socket and rejects the file if the line is there.
+15. If Wi-Fi fails, log.txt says which step failed: the Wi-Fi chip did not appear, the Pi could not join the network, or it joined but got no address from the router.
+16. All pauses in the start-up script are whole seconds, because BusyBox sleep here does not accept fractions.
 
 ### 5.12 Operating modes and the mode button
 
@@ -285,7 +306,8 @@ The appliance uses these values in DPI pixels:
    4. On the first boot only, it grows REC and formats it.
    5. It checks REC and mounts it.
    6. It adds one to the boot count in system/bootcount.txt on REC.
-   7. It writes the Wi-Fi and SSH templates if they are missing. If settings.txt says so, it starts Wi-Fi and SSH.
+   7. It writes the Wi-Fi and SSH templates if they are missing. If settings.txt says so, it starts Wi-Fi and SSH. When the Pi has an address, it starts mdnsd for the name asciicam.local.
+   8. Thirty seconds after boot, it saves the kernel log and the list of loaded drivers to REC.
 4. Init starts the program through the wrapper /usr/bin/asciicam-run. If the program stops, init starts it again.
 
 ### 6.2 The program
@@ -541,7 +563,7 @@ No rebuild is necessary.
 10. Disconnect the power and put the card in your PC.
 11. Open log.txt on REC. Find the line with the words "Wi-Fi is connected". It gives the network address of the Pi, for example 192.168.1.57.
     You can also use the name asciicam.local instead of the address, from any PC that understands mDNS names. Ubuntu, Debian with Avahi, macOS and Windows 10 or newer do. In your router's list of devices, the Pi appears with the name asciicam.
-12. If the log says that Wi-Fi could not connect, check the network name and the password in wifi.txt. The Pi Zero W can use only 2.4 gigahertz networks.
+12. If the log says that Wi-Fi could not join the network, check the network name and the password in wifi.txt. The Pi Zero W can use only 2.4 gigahertz networks. The file system/wifi-log.txt on REC holds the messages of the Wi-Fi program, with the reason. See section 16.
 
 When Wi-Fi is connected, the Pi also sets its clock from the internet. Then new recording files get their real start time.
 
@@ -617,6 +639,8 @@ This writes only partition 2, the root filesystem. If config.txt or cmdline.txt 
 6. If the log says that the REC check repaired problems, this is normal after a power cut.
 7. If the MDA monitor shows no picture, do the measurements in docs/SAFETY.md again.
 8. If the HDMI screen shows no picture, make sure that output is not set to mda.
+9. If Wi-Fi does not work, read the Wi-Fi line in log.txt. Then read system/wifi-log.txt on REC, which holds the messages of the Wi-Fi program. A message with WRONG_KEY means a wrong password. A message with NETWORK-NOT-FOUND means the Pi does not see the network: check the name, and make sure the network has a 2.4 gigahertz band.
+10. If the name asciicam.local does not work, use the address from log.txt. The name needs a PC that understands mDNS names.
 
 ## 17. Licences
 
