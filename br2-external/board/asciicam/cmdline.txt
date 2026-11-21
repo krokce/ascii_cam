@@ -1,0 +1,1 @@
+root=/dev/mmcblk0p2 rootfstype=ext4 ro rootwait console=tty3 quiet loglevel=3 logo.nologo vt.global_cursor_default=0 consoleblank=0

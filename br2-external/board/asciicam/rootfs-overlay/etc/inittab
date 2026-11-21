@@ -1,0 +1,7 @@
+# BusyBox init table for the ASCII camera appliance.
+# First the start-up script runs once. Then the camera program runs,
+# and init starts it again whenever it stops for any reason.
+::sysinit:/etc/init.d/rcS
+::respawn:/usr/bin/asciicam-run
+# SERIAL-CONSOLE-PLACEHOLDER
+::shutdown:/bin/umount -a -r

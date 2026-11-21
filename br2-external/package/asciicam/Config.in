@@ -1,0 +1,30 @@
+config BR2_PACKAGE_ASCIICAM
+	bool "asciicam"
+	depends on BR2_USE_WCHAR # dosfstools
+	select BR2_PACKAGE_DOSFSTOOLS
+	select BR2_PACKAGE_DOSFSTOOLS_FSCK_FAT
+	select BR2_PACKAGE_DOSFSTOOLS_MKFS_FAT
+	select BR2_PACKAGE_UTIL_LINUX
+	select BR2_PACKAGE_UTIL_LINUX_BINARIES
+	select BR2_PACKAGE_UTIL_LINUX_PARTX
+	select BR2_PACKAGE_WPA_SUPPLICANT
+	select BR2_PACKAGE_WPA_SUPPLICANT_NL80211
+	select BR2_PACKAGE_BRCMFMAC_SDIO_FIRMWARE_RPI
+	select BR2_PACKAGE_BRCMFMAC_SDIO_FIRMWARE_RPI_WIFI
+	select BR2_PACKAGE_DROPBEAR
+	help
+	  The camera to MDA text appliance program, its init scripts
+	  and the first-boot REC partition grower. Wi-Fi and SSH are
+	  always included but stay off unless settings.txt on REC
+	  says wifi = on or ssh = on.
+
+if BR2_PACKAGE_ASCIICAM
+
+config BR2_PACKAGE_ASCIICAM_SERIAL_CONSOLE
+	bool "debug: serial console on GPIO 14 and 15"
+	help
+	  Off by default. When on, a login prompt runs on the UART at
+	  115200 baud, on header pin 8 (transmit, GPIO 14) and pin 10
+	  (receive, GPIO 15). These pins are not used by the display.
+
+endif

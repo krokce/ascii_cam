@@ -1,0 +1,4 @@
+# Nothing in the appliance needs these; leaving them out saves boot time.
+# Sound support must stay: the vc4 display driver depends on it.
+# CONFIG_BT is not set
+# CONFIG_USB_GADGET is not set

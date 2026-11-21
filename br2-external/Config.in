@@ -1,0 +1,1 @@
+source "$BR2_EXTERNAL_ASCIICAM_PATH/package/asciicam/Config.in"

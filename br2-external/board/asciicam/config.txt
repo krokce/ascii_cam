@@ -1,0 +1,40 @@
+# This is the firmware settings file for the ASCII camera appliance.
+# Lines starting with a hash sign are comments and are ignored.
+
+# Use the extended firmware, which contains the legacy camera support
+# used by the camera driver.
+start_file=start_x.elf
+fixup_file=fixup_x.dat
+start_x=1
+kernel=zImage
+
+# Give the graphics processor 128 megabytes, which the camera needs.
+gpu_mem=128
+
+# Boot as fast as possible: no rainbow splash, no delay, no automatic
+# probing for cameras or displays, no Bluetooth, no sound.
+disable_splash=1
+boot_delay=0
+camera_auto_detect=0
+display_auto_detect=0
+dtparam=audio=off
+dtoverlay=disable-bt
+
+# The KMS display driver drives HDMI and the DPI port at the same time.
+dtoverlay=vc4-kms-v3d,cma-96
+
+# The next line drives the MDA monitor through the DPI port on the GPIO
+# header. It sets the MDA timing: a 33.333 megahertz pixel clock, 1440
+# pixels per line (each of the 720 MDA dots is sent twice), 350 lines,
+# horizontal sync active high and vertical sync active low. This gives
+# about 18,437 hertz horizontal and about 49.8 hertz vertical.
+# For a Pi that has only an HDMI screen and nothing on the GPIO header,
+# you may put a hash sign at the start of the next line to switch the
+# DPI port off completely. This is optional; the Pi also works with it on.
+dtoverlay=vc4-kms-dpi-generic,rgb565,clock-frequency=33333333,hactive=1440,hfp=58,hsync=270,hbp=40,vactive=350,vfp=1,vsync=16,vbp=3,vsync-invert,width-mm=240,height-mm=180
+
+# This line limits the DPI port to only four GPIO pins: GPIO 2 vertical
+# sync, GPIO 3 horizontal sync, GPIO 18 intensity and GPIO 19 video.
+# All other GPIO pins stay free. Leave it in place even if you switch
+# the line above off.
+dtoverlay=mda-dpi-pins

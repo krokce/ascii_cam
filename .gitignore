@@ -1,0 +1,5 @@
+/buildroot/
+/output/
+/tests/out/
+/tests/test_core
+/src/asciicam

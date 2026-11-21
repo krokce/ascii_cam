@@ -1,0 +1,10 @@
+#!/bin/sh
+# Runs the camera program once. BusyBox init runs this script again
+# whenever it ends, so a crashed program is restarted within a second.
+/usr/bin/asciicam
+status=$?
+if [ "$status" -ne 0 ] && [ -d /rec/system ]; then
+	echo "The camera program stopped with exit code $status and is being restarted." >> /rec/log.txt
+	sync
+fi
+sleep 1

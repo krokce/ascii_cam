@@ -1,0 +1,192 @@
+#!/bin/sh
+# Start-up script for the ASCII camera appliance. BusyBox init runs it
+# once at boot, before the camera program starts. It mounts the
+# temporary filesystems, loads the display and camera drivers, checks
+# and mounts the REC partition, and counts the boot. It starts Wi-Fi and
+# SSH only if settings.txt switches them on. The root filesystem stays
+# read-only the whole time.
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+export PATH
+
+SERIAL=0
+[ -f /etc/asciicam-build.conf ] && . /etc/asciicam-build.conf
+
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run
+mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp
+mkdir -p /dev/pts /dev/shm
+mount -t devpts devpts /dev/pts
+hostname asciicam
+
+# Load the display driver first so the MDA sync signals start as early
+# as possible, then the camera and video encoder drivers. They are
+# loaded here by name because the appliance has no hotplug daemon.
+# i2c_bcm2835 reads the HDMI screen's EDID; panel_simple drives the
+# DPI port; vc4 is the display driver itself. Both lines run in the
+# background, so the REC check below proceeds at the same time.
+modprobe -a i2c_bcm2835 panel_simple vc4 &
+modprobe -a bcm2835_v4l2 bcm2835_codec 2>/dev/null &
+
+REC_DEV=/dev/mmcblk0p3
+DISK=/dev/mmcblk0
+DISK_SYS=/sys/block/mmcblk0
+
+# log_line appends one plain sentence to the log on REC.
+log_line() {
+	[ -d /rec/system ] && echo "Boot $(cat /run/asciicam-boot 2>/dev/null), during start-up: $1" >> /rec/log.txt
+}
+
+# First boot only: the image carries a small REC partition holding a
+# file named GROWME.TXT. If that file is present, REC is enlarged to
+# the end of the card and formatted fresh. Later boots never do this,
+# because a freshly formatted REC has no GROWME.TXT.
+grow_rec() {
+	mount -t vfat -o ro "$REC_DEV" /rec 2>/dev/null || return 0
+	if [ ! -f /rec/GROWME.TXT ]; then
+		umount /rec
+		return 0
+	fi
+	umount /rec
+	disk_size=$(cat $DISK_SYS/size)
+	p_start=$(cat $DISK_SYS/mmcblk0p3/start)
+	p_size=$(cat $DISK_SYS/mmcblk0p3/size)
+	p_end=$((p_start + p_size))
+	if [ $((disk_size - p_end)) -gt 8192 ]; then
+		echo ',+' | sfdisk --no-reread --no-tell-kernel -q -N 3 $DISK
+		partx -u -n 3 $DISK
+	fi
+	mkfs.fat -F 32 -n REC "$REC_DEV" > /dev/null
+	echo 1 > /run/asciicam-rec-grown
+}
+
+grow_rec
+
+# Check the REC filesystem after a possible power cut and repair it
+# automatically, then mount it read-write.
+fsck.fat -a -w "$REC_DEV" > /run/fsck.log 2>&1
+fsck_status=$?
+mkdir -p /rec
+mount -t vfat -o rw,noatime,utf8,shortname=mixed,umask=000,errors=remount-ro "$REC_DEV" /rec
+mkdir -p /rec/recordings /rec/system
+
+# Count this boot. The number names the recording files of this boot.
+boot=0
+[ -f /rec/system/bootcount.txt ] && boot=$(tr -cd '0-9' < /rec/system/bootcount.txt)
+[ -z "$boot" ] && boot=0
+boot=$((boot + 1))
+echo "$boot" > /rec/system/bootcount.txt
+echo "$boot" > /run/asciicam-boot
+
+[ -f /run/asciicam-rec-grown ] && log_line "This was the first boot. The REC partition was enlarged to fill the card and formatted."
+if [ "$fsck_status" -ne 0 ]; then
+	log_line "The REC partition check found and repaired problems, most likely after a power cut."
+fi
+
+# setting NAME prints the value of a line "NAME = value" in settings.txt,
+# in lower case. A missing file or line prints nothing, which means off.
+setting() {
+	[ -f /rec/settings.txt ] || return 0
+	sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\([A-Za-z0-9]*\).*/\1/p" /rec/settings.txt \
+		| tr -d '\r' | tail -n 1 | tr 'A-Z' 'a-z'
+}
+is_on() {
+	case "$1" in on|yes|1) return 0 ;; esac
+	return 1
+}
+WIFI=0; SSH=0
+is_on "$(setting wifi)" && WIFI=1
+is_on "$(setting ssh)" && SSH=1 && WIFI=1
+
+# Templates for the Wi-Fi and SSH files are always placed on REC when
+# missing, so they can be filled in on a PC at any time.
+if [ ! -f /rec/wifi.txt ]; then
+	printf '%s\r\n' \
+		"# Wi-Fi settings. They are used only when settings.txt says wifi = on" \
+		"# or ssh = on. Replace the example name and password below with your" \
+		"# own network's, keeping the words network and password and the equals" \
+		"# signs. The Pi Zero W can use only 2.4 gigahertz networks." \
+		"network = example-network-name" \
+		"password = example-password" > /rec/wifi.txt
+fi
+if [ ! -f /rec/authorized_keys.txt ]; then
+	printf '%s\r\n' \
+		"# SSH keys. They are used only when settings.txt says ssh = on." \
+		"# Paste one public key per line below this comment, exactly as found in" \
+		"# the file ending in .pub on your PC, then remove the example line." \
+		"# Password logins are always refused." \
+		"ssh-ed25519 AAAA-example-key-replace-me you@your-pc" > /rec/authorized_keys.txt
+fi
+
+# Wi-Fi, with network name and password from wifi.txt on REC.
+if [ "$WIFI" = 1 ]; then
+	ssid=$(sed -n 's/^[[:space:]]*network[[:space:]]*=[[:space:]]*//p' /rec/wifi.txt | tr -d '\r' | head -n 1)
+	psk=$(sed -n 's/^[[:space:]]*password[[:space:]]*=[[:space:]]*//p' /rec/wifi.txt | tr -d '\r' | head -n 1)
+	if [ -z "$ssid" ] || [ "$ssid" = "example-network-name" ]; then
+		log_line "Wi-Fi is switched on in settings.txt, but wifi.txt still holds the example network name. Fill in your network name and password."
+	else
+		umask 077
+		{
+			echo 'ctrl_interface=/run/wpa_supplicant'
+			echo 'network={'
+			printf '\tssid="%s"\n' "$ssid"
+			printf '\tpsk="%s"\n' "$psk"
+			echo '}'
+		} > /run/wpa.conf
+		umask 022
+		(
+			modprobe brcmfmac
+			n=0
+			while [ ! -e /sys/class/net/wlan0 ] && [ $n -lt 50 ]; do sleep 0.2; n=$((n + 1)); done
+			ip link set lo up
+			wpa_supplicant -B -i wlan0 -c /run/wpa.conf > /dev/null 2>&1
+			udhcpc -b -q -i wlan0 -s /usr/share/udhcpc/default.script > /dev/null 2>&1 &
+			# Write the network address to the log, so it can be found
+			# without a screen.
+			n=0
+			addr=""
+			while [ -z "$addr" ] && [ $n -lt 60 ]; do
+				sleep 0.5
+				n=$((n + 1))
+				addr=$(ip -4 addr show wlan0 2>/dev/null | sed -n 's/.*inet \([0-9.]*\).*/\1/p' | head -n 1)
+			done
+			if [ -n "$addr" ]; then
+				log_line "Wi-Fi is connected. The network address is $addr."
+			else
+				log_line "Wi-Fi could not connect within 30 seconds. Check the network name and password in wifi.txt."
+			fi
+			sync
+			ntpd -n -q -p pool.ntp.org > /dev/null 2>&1 && touch /run/asciicam-clock-ok
+		) &
+	fi
+fi
+
+# SSH with key login, using authorized_keys.txt on REC.
+if [ "$SSH" = 1 ]; then
+	mkdir -p /run/ssh /rec/system/ssh
+	grep -v '^#' /rec/authorized_keys.txt | grep -v 'example-key' | tr -d '\r' | grep . > /run/ssh/authorized_keys
+	[ -s /run/ssh/authorized_keys ] || log_line "SSH is switched on in settings.txt, but authorized_keys.txt holds no key yet. Paste your public key into it."
+	chmod 700 /run/ssh
+	chmod 600 /run/ssh/authorized_keys
+	key=/rec/system/ssh/dropbear_ed25519_host_key
+	[ -f $key ] || dropbearkey -t ed25519 -f $key > /dev/null 2>&1
+	cp $key /run/ssh/host_key
+	chmod 600 /run/ssh/host_key
+	dropbear -s -r /run/ssh/host_key
+fi
+
+# Thirty seconds after boot, save the kernel log and the list of loaded
+# drivers to REC, for fault finding without a screen. If the display or
+# camera driver did not load, say so in the log in plain words.
+(
+	sleep 30
+	dmesg > /rec/system/kernel-log.txt 2>&1
+	cat /proc/modules > /rec/system/loaded-drivers.txt 2>&1
+	grep -q '^vc4 ' /proc/modules || log_line "The display driver, vc4, did not load. The kernel log is in system/kernel-log.txt on REC."
+	grep -q '^bcm2835_v4l2 ' /proc/modules || log_line "The camera driver, bcm2835_v4l2, did not load. The kernel log is in system/kernel-log.txt on REC."
+	sync
+) &
+
+sync
+exit 0

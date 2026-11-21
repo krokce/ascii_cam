@@ -1,0 +1,37 @@
+/*
+ * mda-dpi-pins: give the DPI display block only the four GPIO pins
+ * that the MDA monitor needs. Load it after vc4-kms-dpi-generic.
+ *
+ *   GPIO 2  = DPI vertical sync
+ *   GPIO 3  = DPI horizontal sync
+ *   GPIO 18 = DPI data bit 14 (red bit 6), used as MDA intensity
+ *   GPIO 19 = DPI data bit 15 (red bit 7), used as MDA video
+ *
+ * Function 6 is alternate function 2, the DPI function. No pull
+ * resistors are changed: GPIO 2 and 3 keep the Pi board's fixed
+ * pull-ups, GPIO 18 and 19 keep their default pull-downs.
+ */
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2835";
+
+	fragment@0 {
+		target = <&gpio>;
+		__overlay__ {
+			mda_dpi_pins: mda_dpi_pins {
+				brcm,pins = <2 3 18 19>;
+				brcm,function = <6>;
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <&dpi>;
+		__overlay__ {
+			pinctrl-names = "default";
+			pinctrl-0 = <&mda_dpi_pins>;
+		};
+	};
+};
