@@ -358,6 +358,7 @@ The appliance uses these values in DPI pixels:
 5. docs holds the wiring guide, the safety guide and the recording format.
 6. buildroot holds the pinned Buildroot source. The Makefile gets it.
 7. output holds the build. The finished image is output/images/sdcard.img.
+8. settings.txt in the project folder is a sample settings file. See section 11.1.
 
 ## 7. Building the image
 
@@ -485,6 +486,28 @@ The settings are these. Each item gives all possible values and the default. The
 For all settings with on and off, the program also accepts yes, no, 1 and 0.
 
 If you delete settings.txt, the program writes a new one with the default values at the next start.
+
+### 11.1 The sample settings file
+
+The project folder holds a sample settings file, named settings.txt. It has the same comments as the file that the Pi writes, in the current version 2 format, with Windows line endings. The program reads it without warnings. It is an example of a working setup, and a quick way to set up a new card.
+
+The sample has these values. All other settings have their default values.
+
+1. mode = 2, which is mode 2, characters.
+2. recording = off. Nothing is recorded.
+3. upside_down = on and mirror = on, for a camera mounted upside down, with a mirrored picture.
+4. wifi = on and ssh = on.
+
+To use the sample on a card, do these steps:
+
+1. Boot the Pi once with the new card, so that REC is enlarged and formatted. Important: the first boot erases any file that you put on REC before.
+2. Disconnect the power and put the card in your PC.
+3. Copy settings.txt from the project folder to the REC partition. Replace the file that is there.
+4. Change any values that you need, as described above.
+5. Because the sample switches on Wi-Fi and SSH, fill in wifi.txt and authorized_keys.txt on REC, as section 14 tells you. If you do not want Wi-Fi and SSH, change both lines to off.
+6. Put the card back in the Pi and connect the power.
+
+The sample holds no passwords and no keys. Those stay in wifi.txt and authorized_keys.txt on the card. Do not put them into the project folder.
 
 If settings.txt comes from an older version of the program, the program updates its comments at the next start and keeps all values. A missing setting gets its default value.
 

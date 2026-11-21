@@ -1,0 +1,125 @@
+# Settings file version 2
+# Settings for the ASCII camera appliance.
+# Each setting is one line: its name, an equals sign, and its value.
+# Lines starting with a hash sign are comments and are ignored.
+# The settings are read when the appliance starts, so after a change,
+# switch the appliance off and on again. If this file is deleted, a
+# fresh copy with the default values is written at the next start.
+
+# The operating mode. The push button on header pins 37 and 39 steps
+# through the three main modes while the appliance runs, and rewrites
+# this line:
+#   shade, or 1, is mode 1: nine tones from shade block characters.
+#   characters, or 2, is mode 2: the ramp of characters given below.
+#   colour, or 3, is mode 3: the real colour camera video on HDMI,
+#   while the MDA monitor shows shade blocks. color is also accepted.
+# Two more drawing modes can be set here, but are not on the button:
+#   halfblocks splits each cell into a top and a bottom half.
+#   shapes picks the character whose shape best fits each cell, like aalib.
+# Possible values: shade, characters, colour, color, halfblocks, shapes, 1, 2, 3.
+# Default: shade.
+mode = 2
+
+# Where the picture goes.
+#   both: the MDA monitor and HDMI at the same time.
+#   mda: the MDA monitor only; HDMI stays off.
+#   hdmi: HDMI only; the MDA sync signals keep running, with a black picture.
+#   emulation: HDMI only, made to look exactly like the MDA monitor. Use it
+#   on a Pi that has no MDA monitor.
+# Possible values: both, mda, hdmi, emulation.
+# Default: both.
+output = both
+
+# The text colour on HDMI, always on black, in the both and hdmi outputs.
+# hdmi_color is also accepted as the name.
+# Possible values: green, amber, white, red.
+# Default: green.
+hdmi_colour = green
+
+# Real gray shades on HDMI. When on, HDMI shows 16 levels of brightness
+# while the MDA monitor keeps its three. hdmi_grey is also accepted.
+# Possible values: on, off, yes, no, 1, 0.
+# Default: off.
+hdmi_gray = off
+
+# The phosphor colour in the emulation output, always on black.
+# Possible values: green, amber, white.
+# Default: green.
+phosphor = green
+
+# Faint scan lines in the emulation output.
+# Possible values: on, off, yes, no, 1, 0.
+# Default: off.
+scanlines = off
+
+# A soft glow round bright characters in the emulation output.
+# Possible values: on, off, yes, no, 1, 0.
+# Default: off.
+glow = off
+
+# The grid size. 40x25 draws every character twice as wide.
+# Possible values: 80x25, 40x25.
+# Default: 80x25.
+grid = 80x25
+
+# The characters of the ramp for the characters mode, from darkest to
+# brightest, between double quotes. The first one is normally a space.
+# Each character except the first also appears in bright form.
+# Possible values: 2 to 60 printable characters, letters, digits, signs
+# or spaces, between double quotes.
+# Default: " .:-=+*#%@".
+ramp = " .:-=+*#%@"
+
+# Dithering spreads rounding errors over the neighbouring cells. It shows
+# more tones but looks grainier. It has no effect in the shapes mode.
+# Possible values: on, off, yes, no, 1, 0.
+# Default: off.
+dithering = off
+
+# The contrast in percent. The picture is always stretched to use the
+# full range of tones, slowly following the scene so it does not
+# flicker. This value makes it softer below 100 and harsher above 100.
+# Possible values: any whole number from 50 to 200.
+# Default: 100.
+contrast = 100
+
+# The highest number of frames per second.
+# Possible values: any whole number from 1 to 30.
+# Default: 15.
+frame_rate = 15
+
+# Recording of the text picture to this partition.
+# Possible values: on, off, yes, no, 1, 0.
+# Default: on.
+recording = off
+
+# Recording of real video, 1280 by 720, to this partition. It fills the
+# card about eight times faster than the text recording and may slow
+# the text picture.
+# Possible values: on, off, yes, no, 1, 0.
+# Default: off.
+video = off
+
+# Set to on if the camera is mounted upside down.
+# Possible values: on, off, yes, no, 1, 0.
+# Default: off.
+upside_down = on
+
+# Set to on to show the picture mirrored left to right, as in a looking
+# glass.
+# Possible values: on, off, yes, no, 1, 0.
+# Default: off.
+mirror = on
+
+# Wi-Fi. When on, the appliance joins the network named in wifi.txt on
+# this partition, and writes its network address to log.txt.
+# Possible values: on, off, yes, no, 1, 0.
+# Default: off.
+wifi = on
+
+# SSH. When on, you can log in as root over the network with a key
+# listed in authorized_keys.txt on this partition. Passwords are always
+# refused. SSH also switches Wi-Fi on.
+# Possible values: on, off, yes, no, 1, 0.
+# Default: off.
+ssh = on
